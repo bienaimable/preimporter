@@ -115,12 +115,12 @@ class Import():
     
     def process_rules(self, node_name, root_node="processed_by_preimporter"):
         """ Function to write a valid XML by adding static items and applying rules on original XML """
-        log.info("Processing rules")
+        log.info("Processing rules and write to file")
         
         with open( self.tmp_directory + self.tmp_dest_filename, "wb" ) as destination_file:
 
             # First write the opening root node
-            destination_file.write(b"<" + root_node.encode("utf-8") + ">\n")
+            destination_file.write(b"<" + root_node.encode("utf-8") + b">\n")
 
             # Then write the static items if any
             for item in self.static_items:
@@ -136,22 +136,25 @@ class Import():
 
                 element_string = Tree.tostring(element, encoding='utf-8', method='xml')
                 destination_file.write(element_string+b'\n')
+                element.clear()
 
             # Now iterate throught the original file to apply the rules
             iterator = Tree.iterparse(self.tmp_directory + self.tmp_src_filename)
             for _, element in iterator:
-                if element.tag == self.node_name:
+                if element.tag == node_name:
                     for rule in self.rules:
                         func = self.find_rule(rule['function'], self.modules)
                         if 'args' in rule:
                             element = func(element, **rule['args'])
                         else:
                             element = func(element)
-                    self._write_element(element, destination_file)
+
+                    element_string = Tree.tostring(element, encoding='utf-8', method='xml')
+                    destination_file.write(element_string+b'\n')
                     element.clear()
 
             # Finally write closing root node
-            destination_file.write(b"</" + root_node.encode("utf-8") + ">\n")
+            destination_file.write(b"</" + root_node.encode("utf-8") + b">\n")
 
 
     def upload(self, destination):
