@@ -5,6 +5,7 @@ import os
 import datetime
 import importlib
 import xml.etree.ElementTree as Tree
+import xml.parsers.expat
 import ftplib
 import gzip
 import shutil
@@ -179,7 +180,11 @@ class FeedManipulator():
                 element.clear()
 
             # Now iterate throught the original file to apply the rules
-            iterator = Tree.iterparse(self.tmp_directory + self.tmp_src_filename)
+            parser = Tree.XMLParser(encoding="utf-8")
+            iterator = Tree.iterparse(
+                    self.tmp_directory + self.tmp_src_filename, 
+                    parser=parser
+                    )
             for _, element in iterator:
                 if element.tag == node_name:
                     for rule in self.rules:
