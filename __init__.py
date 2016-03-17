@@ -10,6 +10,9 @@ import ftplib
 import gzip
 import shutil
 import zipfile
+import requests
+from requests.auth import HTTPBasicAuth
+from requests.auth import HTTPDigestAuth
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -59,28 +62,28 @@ class Tools():
         # Create destination directory
         os.makedirs(destination_filepath.rsplit('/', 1)[0], exist_ok=True)
     
-        try:
-    
-            # Try to download with urllib
-            password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-            top_level_url = "http://example.com/foo/"
-            password_mgr.add_password(None,
-                              source_url,
-                              username,
-                              password)
-            auth_handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
-            opener = urllib.request.build_opener(auth_handler)
-            urllib.request.install_opener(opener)
-            urllib.request.urlretrieve(source_url, destination_filepath)
-    
-        except urllib.error.URLError:
-    
+        # Try to download with requests (HTTP) first, then try ftplib (FTP)
+        auth_methods = [
+            None,
+            HTTPBasicAuth(username, password),
+            HTTPDigestAuth(username, password),
+            ]
+        for auth_method in auth_methods:
+            try:
+                response = requests.get(source_url, auth=auth_method, stream=True)
+            except requests.exceptions.InvalidSchema:
+                continue
+            if response.status_code == requests.codes.ok:
+                with open(destination_filepath, 'wb') as destination_file:
+                    for chunk in response.iter_content(chunk_size=1024): 
+                        destination_file.write(chunk)
+                break
+        else:
             # Parse the source URL to extract elements 
             parsed_url = urllib.parse.urlparse(source_url)
             server = parsed_url.netloc
             path = parsed_url.path.rsplit('/', 1)[0]
             filename = parsed_url.path.split('/')[-1]
-    
             # Try again with ftplib
             with ftplib.FTP(server) as ftp:
                 ftp.login(user=username, passwd=password)
@@ -89,6 +92,36 @@ class Tools():
                         'RETR '+ filename,
                         open(destination_filepath, 'wb').write
                 )
+    
+        #try:
+        #    # Try to download with urllib
+        #    password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        #    top_level_url = "http://example.com/foo/"
+        #    password_mgr.add_password(None,
+        #                      source_url,
+        #                      username,
+        #                      password)
+        #    auth_handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
+        #    opener = urllib.request.build_opener(auth_handler)
+        #    urllib.request.install_opener(opener)
+        #    urllib.request.urlretrieve(source_url, destination_filepath)
+    
+        #except urllib.error.URLError:
+    
+        #    # Parse the source URL to extract elements 
+        #    parsed_url = urllib.parse.urlparse(source_url)
+        #    server = parsed_url.netloc
+        #    path = parsed_url.path.rsplit('/', 1)[0]
+        #    filename = parsed_url.path.split('/')[-1]
+    
+        #    # Try again with ftplib
+        #    with ftplib.FTP(server) as ftp:
+        #        ftp.login(user=username, passwd=password)
+        #        ftp.cwd(path)
+        #        ftp.retrbinary(
+        #                'RETR '+ filename,
+        #                open(destination_filepath, 'wb').write
+        #        )
 
 
 class FeedManipulator():
